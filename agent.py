@@ -237,6 +237,8 @@ async def entrypoint(ctx: agents.JobContext):
         stt=deepgram.STT(
             api_key=settings.DEEPGRAM_API_KEY,
             model="nova-2-conversationalai",
+            interim_results=True,
+            endpointing=200,  # Finalize utterance after 200ms of silence
         ),
         llm=openai.LLM(
             api_key=settings.OPENAI_API_KEY,
@@ -247,7 +249,12 @@ async def entrypoint(ctx: agents.JobContext):
             voice_id=settings.ELEVENLABS_VOICE_ID,
             model="eleven_turbo_v2_5",
         ),
-        vad=silero.VAD.load(),
+        vad=silero.VAD.load(
+            min_speech_duration=0.1,        # Minimum 100ms of speech to start
+            min_silence_duration=0.2,       # End speech after 200ms of silence
+            prefix_padding_duration=0.1,    # 100ms padding before speech
+            activation_threshold=0.5,       # Speech detection sensitivity
+        ),
     )
 
     # Add event listeners for latency tracking
