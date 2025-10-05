@@ -46,3 +46,4 @@ Thumbs.db
 
 # Tests
 tests/
+tests/audio_output/
