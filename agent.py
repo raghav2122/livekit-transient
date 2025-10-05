@@ -8,15 +8,16 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import AsyncIterable
+from typing import AsyncIterable, Optional
 from dotenv import load_dotenv
 
-from livekit import agents
+from livekit import agents, rtc
 from livekit.agents import Agent, AgentSession, WorkerOptions, cli, RoomInputOptions, llm
 from livekit.plugins import deepgram, openai, elevenlabs, silero
 from livekit.plugins.elevenlabs import VoiceSettings
 
 from config import settings
+from filler_manager import FillerSoundManager
 
 load_dotenv()
 
@@ -118,11 +119,14 @@ def load_insurance_prompt():
 class EmotionalVoiceAssistant(Agent):
     """Emotion-aware voice assistant that adapts TTS based on LLM emotion output."""
 
-    def __init__(self) -> None:
+    def __init__(self, filler_manager: Optional[FillerSoundManager] = None, audio_source: Optional[rtc.AudioSource] = None) -> None:
         super().__init__(
             instructions=load_insurance_prompt(),
         )
         self.emotion_config = load_emotion_config()
+        self.filler_manager = filler_manager
+        self.audio_source = audio_source
+        self.last_emotion = "neutral"
 
     async def llm_node(
         self,
@@ -134,10 +138,20 @@ class EmotionalVoiceAssistant(Agent):
         latency_tracker.mark("llm_start")
         first_token = True
 
+        # Start filler sound timer if configured
+        if self.filler_manager and self.audio_source:
+            self.filler_manager.start_filler_timer(
+                self.audio_source,
+                emotion=self.last_emotion
+            )
+
         # Use default LLM processing
         async for chunk in Agent.default.llm_node(self, chat_ctx, tools, model_settings):
             if first_token:
                 latency_tracker.mark("llm_first_token")
+                # Cancel filler sound when first token arrives
+                if self.filler_manager:
+                    self.filler_manager.cancel_filler()
                 first_token = False
             yield chunk
 
@@ -171,6 +185,11 @@ class EmotionalVoiceAssistant(Agent):
             emotion = response_data.get("emotion", "neutral")
             intensity = response_data.get("intensity", 0.5)
             message = response_data.get("message", full_text)
+
+            # Track last emotion for filler sound selection
+            self.last_emotion = emotion
+            if self.filler_manager:
+                self.filler_manager.set_emotion(emotion)
 
             logger.info(f"Emotion: {emotion}, Intensity: {intensity}")
 
@@ -232,6 +251,21 @@ async def entrypoint(ctx: agents.JobContext):
     """
     logger.info(f"Starting agent for room: {ctx.room.name}")
 
+    # Initialize filler sound manager
+    filler_sounds_dir = Path(__file__).parent / "filler_sounds"
+    filler_config_path = Path(__file__).parent / "prompts" / "filler_sounds_config.json"
+
+    filler_manager = None
+    if filler_sounds_dir.exists() and filler_config_path.exists():
+        filler_manager = FillerSoundManager(filler_sounds_dir, filler_config_path)
+        logger.info("Filler sound manager initialized")
+    else:
+        logger.warning("Filler sounds not found, running without filler sound support")
+
+    # Create audio source for filler sounds
+    # Note: We'll need to get this from the room after connecting
+    audio_source = None
+
     # Create agent session with STT, LLM, and TTS
     session = AgentSession(
         stt=deepgram.STT(
@@ -278,7 +312,10 @@ async def entrypoint(ctx: agents.JobContext):
     # Start the session with emotional voice assistant
     await session.start(
         room=ctx.room,
-        agent=EmotionalVoiceAssistant(),
+        agent=EmotionalVoiceAssistant(
+            filler_manager=filler_manager,
+            audio_source=audio_source
+        ),
         room_input_options=RoomInputOptions(
             # Add noise cancellation if needed
             # noise_cancellation=noise_cancellation.BVC(),
