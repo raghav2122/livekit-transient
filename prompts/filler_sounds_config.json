@@ -1,0 +1,65 @@
+{
+  "fillers": {
+    "neutral": [
+      {
+        "text": "hmm",
+        "description": "Thoughtful pause"
+      },
+      {
+        "text": "let me see",
+        "description": "Considering response"
+      },
+      {
+        "text": "ah",
+        "description": "Brief acknowledgment"
+      }
+    ],
+    "happy": [
+      {
+        "text": "ooh!",
+        "description": "Excited acknowledgment"
+      },
+      {
+        "text": "nice!",
+        "description": "Positive response"
+      },
+      {
+        "text": "oh yeah",
+        "description": "Enthusiastic agreement"
+      }
+    ],
+    "sad": [
+      {
+        "text": "mm",
+        "description": "Soft acknowledgment"
+      },
+      {
+        "text": "I see",
+        "description": "Understanding response"
+      },
+      {
+        "text": "ah",
+        "description": "Gentle acknowledgment"
+      }
+    ],
+    "angry": [
+      {
+        "text": "tsk",
+        "description": "Dismissive sound"
+      },
+      {
+        "text": "hm!",
+        "description": "Sharp acknowledgment"
+      },
+      {
+        "text": "ah",
+        "description": "Intense acknowledgment"
+      }
+    ]
+  },
+  "settings": {
+    "filler_trigger_threshold_ms": 500,
+    "max_filler_duration_ms": 1000,
+    "description": "Play filler sound if LLM takes longer than threshold to respond"
+  }
+}

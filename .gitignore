@@ -47,3 +47,6 @@ Thumbs.db
 # Tests
 tests/
 tests/audio_output/
+
+# Generated filler sounds
+filler_sounds/
