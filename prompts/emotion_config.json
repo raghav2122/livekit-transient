@@ -1,0 +1,34 @@
+{
+  "emotions": {
+    "neutral": {
+      "stability": 0.5,
+      "similarity_boost": 0.75,
+      "style": 0.0,
+      "use_speaker_boost": true
+    },
+    "happy": {
+      "stability": 0.3,
+      "similarity_boost": 0.8,
+      "style": 0.6,
+      "use_speaker_boost": true
+    },
+    "sad": {
+      "stability": 0.7,
+      "similarity_boost": 0.85,
+      "style": 0.4,
+      "use_speaker_boost": true
+    },
+    "angry": {
+      "stability": 0.2,
+      "similarity_boost": 0.9,
+      "style": 0.8,
+      "use_speaker_boost": true
+    }
+  },
+  "description": {
+    "neutral": "Balanced, clear speech with moderate variation",
+    "happy": "Energetic, expressive with higher variation and style",
+    "sad": "Slower, more stable with deeper emotional tone",
+    "angry": "Intense, highly expressive with maximum variation"
+  }
+}
