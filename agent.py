@@ -6,6 +6,7 @@ with emotion-based voice modulation.
 
 import json
 import logging
+import time
 from pathlib import Path
 from typing import AsyncIterable
 from dotenv import load_dotenv
@@ -20,6 +21,84 @@ from config import settings
 load_dotenv()
 
 logger = logging.getLogger("voice-agent")
+
+
+class LatencyTracker:
+    """Track latency across the voice pipeline stages."""
+
+    def __init__(self):
+        self.timestamps = {}
+        self.session_start = None
+
+    def mark(self, event: str):
+        """Mark a timestamp for an event."""
+        timestamp = time.time()
+        self.timestamps[event] = timestamp
+        return timestamp
+
+    def get_duration(self, start_event: str, end_event: str) -> float:
+        """Get duration between two events in milliseconds."""
+        if start_event not in self.timestamps or end_event not in self.timestamps:
+            return 0.0
+        return (self.timestamps[end_event] - self.timestamps[start_event]) * 1000
+
+    def log_latency(self):
+        """Log all latency measurements."""
+        if not self.timestamps:
+            return
+
+        logger.info("=" * 60)
+        logger.info("LATENCY ANALYSIS")
+        logger.info("=" * 60)
+
+        # VAD to STT
+        if "user_speech_end" in self.timestamps and "stt_finalized" in self.timestamps:
+            vad_to_stt = self.get_duration("user_speech_end", "stt_finalized")
+            logger.info(f"VAD → STT Finalization: {vad_to_stt:.2f}ms")
+
+        # STT to LLM start
+        if "stt_finalized" in self.timestamps and "llm_start" in self.timestamps:
+            stt_to_llm = self.get_duration("stt_finalized", "llm_start")
+            logger.info(f"STT → LLM Start: {stt_to_llm:.2f}ms")
+
+        # LLM TTFT (Time To First Token)
+        if "llm_start" in self.timestamps and "llm_first_token" in self.timestamps:
+            llm_ttft = self.get_duration("llm_start", "llm_first_token")
+            logger.info(f"LLM TTFT (Time To First Token): {llm_ttft:.2f}ms")
+
+        # LLM completion
+        if "llm_start" in self.timestamps and "llm_complete" in self.timestamps:
+            llm_total = self.get_duration("llm_start", "llm_complete")
+            logger.info(f"LLM Total Processing: {llm_total:.2f}ms")
+
+        # LLM to TTS start
+        if "llm_complete" in self.timestamps and "tts_start" in self.timestamps:
+            llm_to_tts = self.get_duration("llm_complete", "tts_start")
+            logger.info(f"LLM → TTS Start: {llm_to_tts:.2f}ms")
+
+        # TTS first chunk
+        if "tts_start" in self.timestamps and "tts_first_chunk" in self.timestamps:
+            tts_ttfc = self.get_duration("tts_start", "tts_first_chunk")
+            logger.info(f"TTS Time To First Chunk: {tts_ttfc:.2f}ms")
+
+        # TTS completion
+        if "tts_start" in self.timestamps and "tts_complete" in self.timestamps:
+            tts_total = self.get_duration("tts_start", "tts_complete")
+            logger.info(f"TTS Total Generation: {tts_total:.2f}ms")
+
+        # Total end-to-end latency
+        if "user_speech_end" in self.timestamps and "tts_first_chunk" in self.timestamps:
+            total_latency = self.get_duration("user_speech_end", "tts_first_chunk")
+            logger.info(f"TOTAL END-TO-END LATENCY: {total_latency:.2f}ms")
+
+        logger.info("=" * 60)
+
+        # Reset for next turn
+        self.timestamps.clear()
+
+
+# Global latency tracker
+latency_tracker = LatencyTracker()
 
 
 def load_emotion_config():
@@ -52,9 +131,17 @@ class EmotionalVoiceAssistant(Agent):
         model_settings
     ) -> AsyncIterable[llm.ChatChunk]:
         """Override LLM node to get structured JSON response with emotion."""
+        latency_tracker.mark("llm_start")
+        first_token = True
+
         # Use default LLM processing
         async for chunk in Agent.default.llm_node(self, chat_ctx, tools, model_settings):
+            if first_token:
+                latency_tracker.mark("llm_first_token")
+                first_token = False
             yield chunk
+
+        latency_tracker.mark("llm_complete")
 
     async def tts_node(
         self,
@@ -62,6 +149,8 @@ class EmotionalVoiceAssistant(Agent):
         model_settings
     ):
         """Override TTS node to apply emotion-based voice settings."""
+        latency_tracker.mark("tts_start")
+
         # Collect full text from LLM
         full_text = ""
         async for chunk in text:
@@ -106,7 +195,16 @@ class EmotionalVoiceAssistant(Agent):
             async def text_stream():
                 yield message
 
-            return Agent.default.tts_node(self, text_stream(), model_settings)
+            # Wrap TTS output to track first chunk
+            first_chunk = True
+            async for audio_chunk in Agent.default.tts_node(self, text_stream(), model_settings):
+                if first_chunk:
+                    latency_tracker.mark("tts_first_chunk")
+                    first_chunk = False
+                yield audio_chunk
+
+            latency_tracker.mark("tts_complete")
+            latency_tracker.log_latency()
 
         except (json.JSONDecodeError, KeyError) as e:
             logger.error(f"Failed to parse emotion from LLM response: {e}")
@@ -114,7 +212,16 @@ class EmotionalVoiceAssistant(Agent):
             async def fallback_stream():
                 yield full_text
 
-            return Agent.default.tts_node(self, fallback_stream(), model_settings)
+            # Wrap TTS output to track first chunk
+            first_chunk = True
+            async for audio_chunk in Agent.default.tts_node(self, fallback_stream(), model_settings):
+                if first_chunk:
+                    latency_tracker.mark("tts_first_chunk")
+                    first_chunk = False
+                yield audio_chunk
+
+            latency_tracker.mark("tts_complete")
+            latency_tracker.log_latency()
 
 
 async def entrypoint(ctx: agents.JobContext):
@@ -142,6 +249,24 @@ async def entrypoint(ctx: agents.JobContext):
         ),
         vad=silero.VAD.load(),
     )
+
+    # Add event listeners for latency tracking
+    @session.on("user_speech_committed")
+    def on_user_speech_committed(msg):
+        """Track when user finishes speaking (VAD detected end)."""
+        latency_tracker.mark("user_speech_end")
+        logger.debug(f"User speech ended: {msg.text if hasattr(msg, 'text') else ''}")
+
+    @session.on("user_transcript_committed")
+    def on_transcript_committed(msg):
+        """Track when STT finalizes transcript."""
+        latency_tracker.mark("stt_finalized")
+        logger.debug(f"STT finalized transcript: {msg.text if hasattr(msg, 'text') else ''}")
+
+    @session.on("agent_started_speaking")
+    def on_agent_speaking():
+        """Track when agent starts speaking."""
+        logger.debug("Agent started speaking")
 
     # Start the session with emotional voice assistant
     await session.start(
