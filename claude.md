@@ -72,3 +72,40 @@ Request → Brainstorm → Ask Clarifications → Get Approval → Implement →
 **After feature:** Commit immediately
 **Scope creep:** Ask first (expect "no")
 **User's solution:** Follow it (correct if wrong)
+
+---
+
+## 🔧 Project-Specific Rules
+
+### File Naming Conventions
+- **All files:** `snake_case` naming
+- **Prompts:** Store in `prompts/` folder, use `.md` extension
+- **Tests:** Store in `tests/` folder, prefix with `test_`
+
+### Testing Requirements
+- Create dedicated test files for features
+- Use **actual API calls** (not mocks) for integration tests
+- Test files should be standalone and runnable
+
+### MCP Tool Preferences
+
+**Use Exa MCP when:**
+- ✅ Need quick code examples
+- ✅ Looking for package versions
+- ✅ Initial research/discovery
+- ✅ No time for indexing
+
+**Use Nia MCP when:**
+- ✅ Deep documentation analysis needed
+- ✅ Building persistent knowledge base
+- ✅ Complex codebase understanding
+- ✅ Will search same docs repeatedly
+
+**Best workflow:** Exa (quick scan) → Nia (index if valuable) → Deep search with Nia
+
+### Folder Structure
+```
+prompts/          # System prompts, configs (.md files)
+tests/            # Test files (test_*.py)
+├── test_*.py     # Actual API-based tests
+```
