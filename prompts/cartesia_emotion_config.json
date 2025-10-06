@@ -1,0 +1,34 @@
+{
+  "emotions": {
+    "neutral": {
+      "speed": "normal",
+      "emotion": []
+    },
+    "happy": {
+      "speed": "fast",
+      "emotion": ["positivity:highest", "curiosity:high"]
+    },
+    "sad": {
+      "speed": "slowest",
+      "emotion": ["sadness:highest"]
+    },
+    "angry": {
+      "speed": "fastest",
+      "emotion": ["anger:highest"]
+    }
+  },
+  "description": {
+    "neutral": "Balanced, clear speech at normal pace",
+    "happy": "Fast, energetic with high positivity",
+    "sad": "Slow, somber with high sadness",
+    "angry": "Fast, intense with high anger"
+  },
+  "speed_mapping": {
+    "slowest": "slowest",
+    "slow": "slow",
+    "normal": "normal",
+    "fast": "fast",
+    "fastest": "fastest"
+  },
+  "emotion_levels": ["lowest", "low", "medium", "high", "highest"]
+}

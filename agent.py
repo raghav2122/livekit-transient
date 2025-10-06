@@ -1,6 +1,6 @@
 """LiveKit Voice Agent implementation using AgentSession API.
 
-This agent uses STT (Deepgram) -> LLM (OpenAI) -> TTS (ElevenLabs) pipeline
+This agent uses STT (Deepgram) -> LLM (OpenAI) -> TTS (Cartesia) pipeline
 with emotion-based voice modulation.
 """
 
@@ -13,8 +13,7 @@ from dotenv import load_dotenv
 
 from livekit import agents, rtc
 from livekit.agents import Agent, AgentSession, WorkerOptions, cli, RoomInputOptions, llm
-from livekit.plugins import deepgram, openai, elevenlabs, silero
-from livekit.plugins.elevenlabs import VoiceSettings
+from livekit.plugins import deepgram, openai, cartesia, silero
 
 from config import settings
 from filler_manager import FillerSoundManager
@@ -103,8 +102,8 @@ latency_tracker = LatencyTracker()
 
 
 def load_emotion_config():
-    """Load emotion configuration from prompts folder."""
-    config_path = Path(__file__).parent / "prompts" / "emotion_config.json"
+    """Load Cartesia emotion configuration from prompts folder."""
+    config_path = Path(__file__).parent / "prompts" / "cartesia_emotion_config.json"
     with open(config_path) as f:
         return json.load(f)
 
@@ -193,22 +192,18 @@ class EmotionalVoiceAssistant(Agent):
 
             logger.info(f"Emotion: {emotion}, Intensity: {intensity}")
 
-            # Get base emotion settings
+            # Get base emotion settings for Cartesia
             emotion_settings = self.emotion_config["emotions"].get(emotion, self.emotion_config["emotions"]["neutral"])
 
-            # Apply intensity scaling (optional - adjust settings based on intensity)
-            # For now, just use the preset
-
-            # Update TTS voice settings
+            # Update Cartesia TTS voice controls
             tts = self.tts
-            if isinstance(tts, elevenlabs.TTS):
-                voice_settings = VoiceSettings(
-                    stability=emotion_settings["stability"],
-                    similarity_boost=emotion_settings["similarity_boost"],
-                    style=emotion_settings["style"],
-                    use_speaker_boost=emotion_settings["use_speaker_boost"]
-                )
-                tts.update_options(voice_settings=voice_settings)
+            if isinstance(tts, cartesia.TTS):
+                # Cartesia uses experimental_voice_controls
+                voice_controls = {
+                    "speed": emotion_settings["speed"],
+                    "emotion": emotion_settings["emotion"]
+                }
+                tts.update_options(experimental_voice_controls=voice_controls)
 
             # Return message text for TTS
             async def text_stream():
@@ -271,17 +266,15 @@ async def entrypoint(ctx: agents.JobContext):
         stt=deepgram.STT(
             api_key=settings.DEEPGRAM_API_KEY,
             model="nova-2-conversationalai",
-            interim_results=True,
-            endpointing=200,  # Finalize utterance after 200ms of silence
         ),
         llm=openai.LLM(
             api_key=settings.OPENAI_API_KEY,
             model="gpt-4o-mini",
         ),
-        tts=elevenlabs.TTS(
-            api_key=settings.ELEVENLABS_API_KEY,
-            voice_id=settings.ELEVENLABS_VOICE_ID,
-            model="eleven_turbo_v2_5",
+        tts=cartesia.TTS(
+            api_key=settings.CARTESIA_API_KEY,
+            voice=settings.CARTESIA_VOICE_ID,
+            model="sonic-english",  # Ultra-low latency model
         ),
         vad=silero.VAD.load(
             min_speech_duration=0.1,        # Minimum 100ms of speech to start

@@ -21,11 +21,15 @@ class Settings:
     # Deepgram Configuration
     DEEPGRAM_API_KEY: str = os.getenv("DEEPGRAM_API_KEY", "")
 
-    # ElevenLabs Configuration
+    # ElevenLabs Configuration (DEPRECATED)
     ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
     ELEVENLABS_VOICE_ID: str = os.getenv(
         "ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"
     )  # Default: Rachel voice
+
+    # Cartesia Configuration
+    CARTESIA_API_KEY: str = os.getenv("CARTESIA_API_KEY", "")
+    CARTESIA_VOICE_ID: str = os.getenv("CARTESIA_VOICE_ID", "")
 
     # Agent Configuration
     AGENT_INSTRUCTIONS: str = """You are a helpful voice assistant.
@@ -41,7 +45,7 @@ class Settings:
             "LIVEKIT_API_SECRET",
             "OPENAI_API_KEY",
             "DEEPGRAM_API_KEY",
-            "ELEVENLABS_API_KEY",
+            "CARTESIA_API_KEY",
         ]
 
         missing_keys = [
