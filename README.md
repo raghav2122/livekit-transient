@@ -1,300 +1,313 @@
 # LiveKit Voice AI Agent
 
-A real-time voice AI agent built with **LiveKit**, **FastAPI**, and modern AI services. This project implements a complete voice conversation pipeline using:
+An ultra-low-latency voice AI agent built with LiveKit that features emotion-aware responses, intelligent filler sounds, and comprehensive latency tracking. Perfect for building natural, conversational voice interfaces.
 
-- **STT (Speech-to-Text)**: Deepgram
-- **LLM (Language Model)**: OpenAI GPT-4
-- **TTS (Text-to-Speech)**: ElevenLabs
-- **Infrastructure**: LiveKit for WebRTC real-time communication
+## Features
 
-## Architecture
+### 🎭 Emotion-Aware Voice Modulation
+- LLM analyzes conversation context and outputs emotion metadata
+- TTS dynamically adjusts voice parameters (speed, emotion) based on detected sentiment
+- Supports: `neutral`, `happy`, `sad`, `angry`, `confused`, `curious`, `excited`
+- Powered by Cartesia's ultra-low-latency TTS with experimental voice controls
 
-The system uses LiveKit's `VoicePipelineAgent` which chains together:
+### 🔊 Intelligent Filler Sounds
+- Plays natural filler sounds ("hmm", "ah", "well") during LLM processing
+- Emotion-matched fillers for conversational authenticity
+- Configurable trigger thresholds to prevent awkward silences
+- Automatically cancels when LLM responds
 
+### ⚡ Latency Optimization
+- Real-time latency tracking across the entire voice pipeline:
+  - VAD → STT finalization
+  - STT → LLM start
+  - LLM Time To First Token (TTFT)
+  - LLM → TTS start
+  - TTS Time To First Chunk
+  - Total end-to-end latency
+- Optimized VAD settings for natural conversation flow
+- Uses Cartesia's `sonic-english` model for ultra-low TTS latency
+
+### 🧠 Voice Pipeline Architecture
 ```
-User Audio → Deepgram STT → OpenAI GPT → ElevenLabs TTS → Agent Audio
+User Speech → VAD (Silero) → STT (Deepgram Nova-2) → LLM (GPT-4o-mini) → TTS (Cartesia Sonic)
+                                                            ↓
+                                                    Emotion Analysis
+                                                            ↓
+                                            Voice Modulation + Filler Sounds
 ```
 
-The pipeline handles:
-- Turn detection and interruptions
-- Voice activity detection (VAD)
-- Real-time streaming audio
-- Natural conversation flow
+## Tech Stack
 
-## Project Structure
+- **LiveKit**: Real-time voice infrastructure
+- **Deepgram**: Speech-to-Text (Nova-2 Conversational AI model)
+- **OpenAI**: Language model (GPT-4o-mini with structured outputs)
+- **Cartesia**: Text-to-Speech (Sonic English - ultra-low latency)
+- **Silero VAD**: Voice Activity Detection
+- **FastAPI**: API server (optional)
+- **Python 3.12+**: Runtime
 
-```
-livekit-transient/
-├── pyproject.toml          # UV package configuration
-├── .env                    # Environment variables (create from .env.example)
-├── .env.example            # Template for environment variables
-├── main.py                 # FastAPI REST API server
-├── agent.py                # LiveKit voice agent implementation
-├── config.py               # Configuration management
-└── README.md               # This file
-```
+## Installation
 
-## Prerequisites
-
-- **Python** >= 3.12
-- **UV** package manager ([installation guide](https://github.com/astral-sh/uv))
-- **LiveKit Cloud** account or self-hosted instance
+### Prerequisites
+- Python 3.12 or higher
+- [uv](https://github.com/astral-sh/uv) package manager (recommended) or pip
+- LiveKit account ([sign up free](https://livekit.io))
 - API keys for:
-  - LiveKit
   - OpenAI
   - Deepgram
-  - ElevenLabs
+  - Cartesia
 
-## Setup
+### Setup
 
-### 1. Clone and Install Dependencies
-
+1. **Clone the repository**
 ```bash
+git clone https://github.com/yourusername/livekit-transient.git
 cd livekit-transient
+```
 
-# Install dependencies using UV
+2. **Install dependencies**
+```bash
+# Using uv (recommended)
 uv sync
+
+# Or using pip
+pip install -r requirements.txt
 ```
 
-### 2. Configure Environment Variables
-
+3. **Configure environment variables**
 ```bash
-# Copy the example environment file
 cp .env.example .env
-
-# Edit .env and add your API keys
 ```
 
-Required environment variables:
-
-```bash
+Edit `.env` with your credentials:
+```env
 # LiveKit Configuration
-LIVEKIT_URL=wss://your-instance.livekit.cloud
-LIVEKIT_API_KEY=your_api_key
-LIVEKIT_API_SECRET=your_api_secret
+LIVEKIT_URL=wss://your-livekit-instance.livekit.cloud
+LIVEKIT_API_KEY=your_livekit_api_key
+LIVEKIT_API_SECRET=your_livekit_api_secret
 
-# OpenAI API Key
-OPENAI_API_KEY=sk-...
+# OpenAI API Key (for LLM)
+OPENAI_API_KEY=your_openai_api_key
 
-# Deepgram API Key
-DEEPGRAM_API_KEY=your_deepgram_key
+# Deepgram API Key (for STT)
+DEEPGRAM_API_KEY=your_deepgram_api_key
 
-# ElevenLabs API Key
-ELEVENLABS_API_KEY=your_elevenlabs_key
-ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM  # Optional: Default is Rachel
+# Cartesia API Key (for TTS)
+CARTESIA_API_KEY=your_cartesia_api_key
+CARTESIA_VOICE_ID=your_voice_id  # e.g., a0e99841-438c-4a64-b679-ae501e7d6091
 ```
 
-### 3. Get API Keys
-
-- **LiveKit**: Sign up at [livekit.io](https://livekit.io) or use self-hosted
-- **OpenAI**: Get API key from [platform.openai.com](https://platform.openai.com)
-- **Deepgram**: Sign up at [deepgram.com](https://deepgram.com)
-- **ElevenLabs**: Get API key from [elevenlabs.io](https://elevenlabs.io)
+4. **Generate filler sounds** (optional but recommended)
+```bash
+uv run python generate_filler_sounds.py
+```
 
 ## Usage
 
-### Running the FastAPI Server
-
-Start the REST API server to manage rooms and tokens:
-
-```bash
-uv run uvicorn main:app --reload
-```
-
-The API will be available at `http://localhost:8000`
-
-**API Endpoints:**
-
-- `GET /` - Health check
-- `POST /rooms` - Create a new LiveKit room
-- `POST /token` - Generate access token for a participant
-- `GET /rooms` - List all active rooms
-- `DELETE /rooms/{room_name}` - Delete a room
-
-**Example: Create a room**
-
-```bash
-curl -X POST http://localhost:8000/rooms \
-  -H "Content-Type: application/json" \
-  -d '{"room_name": "my-voice-room"}'
-```
-
-**Example: Generate token**
-
-```bash
-curl -X POST http://localhost:8000/token \
-  -H "Content-Type: application/json" \
-  -d '{
-    "room_name": "my-voice-room",
-    "participant_identity": "user123",
-    "participant_name": "John Doe"
-  }'
-```
-
-### Running the Voice Agent
-
-Start the LiveKit agent worker:
+### Run the Agent (Development Mode)
 
 ```bash
 uv run python agent.py dev
 ```
 
-This will:
-1. Connect to your LiveKit server
-2. Wait for participants to join rooms
-3. Automatically start voice conversations
-4. Handle STT → LLM → TTS pipeline
+This starts the agent in development mode with a local LiveKit server.
 
-### Testing in Console Mode
+### Connect to the Agent
 
-For testing, you can run the agent in console mode:
+1. Open the LiveKit Playground: `https://your-livekit-instance.livekit.cloud`
+2. Create a new room
+3. The agent will automatically join and greet you
+
+Alternatively, build your own client using [LiveKit's client SDKs](https://docs.livekit.io/client-sdk-js/).
+
+### Production Deployment
 
 ```bash
-uv run python agent.py console
+# Using uv
+uv run python agent.py start
+
+# Or with custom worker options
+uv run python agent.py start --num-workers 4
 ```
 
-This allows you to test the voice agent directly from your terminal.
+## Configuration
 
-## How It Works
+### Emotion Settings
+Edit `prompts/cartesia_emotion_config.json` to customize voice modulation:
+```json
+{
+  "emotions": {
+    "happy": {
+      "speed": 1.1,
+      "emotion": ["positivity:highest", "curiosity:high"]
+    },
+    "angry": {
+      "speed": 1.2,
+      "emotion": ["anger:high", "intensity:highest"]
+    }
+  }
+}
+```
 
-### 1. FastAPI Server (`main.py`)
+### Filler Sounds
+Edit `prompts/filler_sounds_config.json` to configure:
+- Trigger threshold (delay before playing filler)
+- Filler texts per emotion
+- Cartesia voice settings for generation
 
-- Provides REST endpoints to manage LiveKit infrastructure
-- Creates rooms for voice conversations
-- Generates access tokens for participants
-- Uses LiveKit API for room management
+### System Prompt
+Customize the agent's personality in `prompts/insurance_salesman_prompt.md`.
 
-### 2. Voice Agent (`agent.py`)
-
-- Implements `VoicePipelineAgent` with custom configuration
-- Connects to LiveKit rooms as a participant
-- Processes audio through the STT → LLM → TTS pipeline
-- Handles conversation flow, interruptions, and turn detection
-
-### 3. Configuration (`config.py`)
-
-- Loads environment variables
-- Validates required API keys
-- Provides centralized settings management
-
-## Voice Pipeline Details
-
-The `VoicePipelineAgent` automatically manages:
-
-- **Voice Activity Detection (VAD)**: Detects when users start/stop speaking
-- **Turn Detection**: Identifies conversation turns for natural dialogue
-- **Interruption Handling**: Allows users to interrupt the agent mid-sentence
-- **Streaming**: Real-time audio streaming with minimal latency
-
-## Customization
-
-### Change the Agent's Instructions
-
-Edit `config.py`:
-
+### VAD Settings
+Adjust Voice Activity Detection in [agent.py:280-285](agent.py#L280-L285):
 ```python
-AGENT_INSTRUCTIONS: str = """Your custom instructions here..."""
-```
-
-### Use Different AI Models
-
-Edit `agent.py`:
-
-```python
-# Change STT model
-stt=deepgram.STT(
-    api_key=settings.DEEPGRAM_API_KEY,
-    model="nova-2-general",  # Change model here
-)
-
-# Change LLM
-llm=openai.LLM(
-    api_key=settings.OPENAI_API_KEY,
-    model="gpt-4o",  # Use GPT-4 instead
-)
-
-# Change TTS voice
-tts=elevenlabs.TTS(
-    api_key=settings.ELEVENLABS_API_KEY,
-    voice_id="different-voice-id",  # Change voice
-    model_id="eleven_turbo_v2_5",
+vad=silero.VAD.load(
+    min_speech_duration=0.1,        # Minimum 100ms of speech to start
+    min_silence_duration=0.2,       # End speech after 200ms of silence
+    prefix_padding_duration=0.1,    # 100ms padding before speech
+    activation_threshold=0.5,       # Speech detection sensitivity
 )
 ```
 
-### Available ElevenLabs Voices
+## Project Structure
 
-Popular voice IDs:
-- `21m00Tcm4TlvDq8ikWAM` - Rachel (default)
-- `EXAVITQu4vr4xnSDxMaL` - Bella
-- `ErXwobaYiN019PkySvjV` - Antoni
-
-Find more at [elevenlabs.io/voice-library](https://elevenlabs.io/voice-library)
+```
+livekit-transient/
+├── agent.py                    # Main agent implementation
+├── filler_manager.py           # Filler sound management
+├── generate_filler_sounds.py  # TTS generation for filler sounds
+├── config.py                   # Settings and environment validation
+├── main.py                     # FastAPI server (optional)
+├── prompts/
+│   ├── insurance_salesman_prompt.md      # System prompt
+│   ├── cartesia_emotion_config.json      # Voice modulation settings
+│   └── filler_sounds_config.json         # Filler sound configuration
+├── filler_sounds/              # Generated filler audio files
+└── tests/                      # Integration tests
+```
 
 ## Development
 
-### Project Dependencies
+### Testing
 
-Core packages:
-- `fastapi` - Modern web framework
-- `uvicorn` - ASGI server
-- `livekit-agents` - LiveKit agent framework
-- `livekit-plugins-openai` - OpenAI integration
-- `livekit-plugins-deepgram` - Deepgram STT
-- `livekit-plugins-elevenlabs` - ElevenLabs TTS
-- `livekit-plugins-silero` - Voice activity detection
-- `python-dotenv` - Environment variable management
-
-### Adding New Features
-
-To add tools or functions the agent can use:
-
-```python
-from livekit.agents import llm
-
-# Define a function
-async def get_weather(location: str) -> str:
-    return f"The weather in {location} is sunny"
-
-# Add to agent context
-fnc_ctx = llm.FunctionContext()
-fnc_ctx.ai_callable()(get_weather)
-
-# Update agent creation in agent.py
-agent = VoicePipelineAgent(
-    # ... existing config ...
-    fnc_ctx=fnc_ctx,
-)
+Run integration tests with actual API calls:
+```bash
+uv run python tests/test_emotion_pipeline.py
 ```
+
+### Latency Monitoring
+
+The agent logs detailed latency metrics for each conversation turn:
+```
+============================================================
+LATENCY ANALYSIS
+============================================================
+VAD → STT Finalization: 342.15ms
+STT → LLM Start: 12.45ms
+LLM TTFT (Time To First Token): 287.33ms
+LLM Total Processing: 1543.21ms
+LLM → TTS Start: 5.67ms
+TTS Time To First Chunk: 156.89ms
+TTS Total Generation: 2341.56ms
+TOTAL END-TO-END LATENCY: 786.37ms
+============================================================
+```
+
+### Customizing the Agent
+
+1. **Change the persona**: Edit `prompts/insurance_salesman_prompt.md`
+2. **Add emotions**: Update `prompts/cartesia_emotion_config.json`
+3. **Modify LLM**: Change model in [agent.py:271](agent.py#L271)
+4. **Switch TTS provider**: Replace Cartesia with ElevenLabs or other providers
+5. **Adjust VAD sensitivity**: Tune parameters in [agent.py:279-285](agent.py#L279-L285)
+
+## How It Works
+
+### Emotion Detection Flow
+
+1. User speaks → VAD detects speech → STT transcribes
+2. LLM receives transcript and outputs structured JSON:
+   ```json
+   {
+     "emotion": "happy",
+     "intensity": 0.8,
+     "message": "That's wonderful! I'm so glad to hear that."
+   }
+   ```
+3. Agent extracts emotion and intensity
+4. TTS voice controls are updated dynamically
+5. Filler sound manager tracks last emotion for future fillers
+
+### Filler Sound System
+
+1. LLM processing starts → Filler timer begins (default: 800ms)
+2. If LLM first token arrives before threshold:
+   - Timer cancelled, no filler plays
+3. If threshold exceeded:
+   - Emotion-appropriate filler plays ("hmm...", "well...")
+   - Reduces perceived latency
+4. Filler automatically stops when LLM response starts
+
+## API Keys & Pricing
+
+- **LiveKit**: Free tier available, pay-as-you-go
+- **Deepgram**: $0.0043/min for Nova-2 model
+- **OpenAI**: ~$0.15/1M input tokens, ~$0.60/1M output tokens (GPT-4o-mini)
+- **Cartesia**: ~$0.05/1K characters (Sonic model)
+
+Typical cost: **~$0.02-0.05 per minute** of conversation.
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Import errors**:
-```bash
-# Ensure virtual environment is activated
-source .venv/bin/activate  # On Unix/macOS
-# or
-.venv\Scripts\activate  # On Windows
-```
+**Agent doesn't respond:**
+- Check all API keys are valid in `.env`
+- Verify LiveKit connection: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`
+- Check firewall/network allows WebSocket connections
 
-**API connection errors**:
-- Verify all API keys are correct in `.env`
-- Check LiveKit URL format: `wss://your-instance.livekit.cloud`
-- Ensure you have credits/quota on all services
+**High latency:**
+- Use Cartesia's `sonic-english` model (already configured)
+- Reduce VAD `min_silence_duration` (may cause interruptions)
+- Check your network connection to API providers
+- Consider geographic proximity to API servers
 
-**Agent not responding**:
-- Check agent logs for errors
-- Verify room exists before connecting agent
-- Ensure participant has proper permissions
+**Filler sounds not playing:**
+- Run `python generate_filler_sounds.py` to create audio files
+- Verify `filler_sounds/` directory contains `.wav` files
+- Check `prompts/filler_sounds_config.json` exists
 
-## Resources
+**Audio quality issues:**
+- Try different Cartesia voice IDs
+- Adjust `speed` in emotion config (range: 0.8-1.3)
+- Check room audio settings in LiveKit dashboard
 
-- [LiveKit Documentation](https://docs.livekit.io)
-- [LiveKit Agents Guide](https://docs.livekit.io/agents/)
-- [FastAPI Documentation](https://fastapi.tiangolo.com)
-- [UV Package Manager](https://github.com/astral-sh/uv)
+## Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Follow existing code style (snake_case, prompts in `prompts/`)
+4. Test with real API calls (not mocks)
+5. Submit a pull request
 
 ## License
 
-MIT
+MIT License - see LICENSE file for details.
+
+## Acknowledgments
+
+- Built with [LiveKit Agents Framework](https://docs.livekit.io/agents/)
+- Emotion-aware TTS inspired by conversational AI research
+- Filler sound technique based on human conversation patterns
+
+## Links
+
+- [LiveKit Documentation](https://docs.livekit.io/)
+- [Cartesia Sonic TTS](https://cartesia.ai/)
+- [Deepgram Nova-2](https://deepgram.com/product/nova-2)
+- [OpenAI Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+
+---
+
+**Built with ❤️ for natural voice conversations**
